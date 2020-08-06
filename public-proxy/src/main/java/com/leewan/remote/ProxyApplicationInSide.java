@@ -1,21 +1,11 @@
 package com.leewan.remote;
 
 
-import org.apache.commons.cli.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.leewan.framework.util.IOUtils;
-
-import io.netty.buffer.ByteBuf;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.ByteBuffer;
-import java.nio.channels.ClosedChannelException;
-import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
@@ -23,7 +13,6 @@ import java.nio.channels.SocketChannel;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.concurrent.CountDownLatch;
 
 public class ProxyApplicationInSide extends Thread {
 
@@ -80,7 +69,6 @@ public class ProxyApplicationInSide extends Thread {
     	
     	try {
     		if(SocketChannelManager.hasChannle(channel)) {
-        		ByteBuffer buf = ByteBuffer.allocateDirect(BUF_SIZE);
         		SocketChannelManager.handleChannelReadContent(channel);
         	}else {
         		//第一次读
