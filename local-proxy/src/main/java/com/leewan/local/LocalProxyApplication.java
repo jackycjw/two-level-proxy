@@ -2,6 +2,8 @@ package com.leewan.local;
 
 
 import com.leewan.framework.util.MathUtil;
+import com.leewan.framework.util.ThreadUtils;
+
 import org.apache.commons.cli.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,8 +24,15 @@ public class LocalProxyApplication {
         parseArgs(args);
 
         //该socket为控制通道
-        Socket remote = new Socket(LocalProxyApplication.host_remote, LocalProxyApplication.port_remote);
-        remote.getOutputStream().write(MathUtil.getBytes(Integer.MAX_VALUE));
+        boolean flag = false;
+        Socket remote = null;
+        try {
+        	remote = new Socket(LocalProxyApplication.host_remote, LocalProxyApplication.port_remote);
+            remote.getOutputStream().write(MathUtil.getBytes(Integer.MAX_VALUE));
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+        
 
         while(true){
             try {
@@ -34,8 +43,13 @@ public class LocalProxyApplication {
                 new ProxyRunner(bs).start();
 
             } catch (Exception e) {
-                remote = new Socket(LocalProxyApplication.host_remote, LocalProxyApplication.port_remote);
-                remote.getOutputStream().write(MathUtil.getBytes(Integer.MAX_VALUE));
+            	try {
+            		remote = new Socket(LocalProxyApplication.host_remote, LocalProxyApplication.port_remote);
+                    remote.getOutputStream().write(MathUtil.getBytes(Integer.MAX_VALUE));
+                    ThreadUtils.sleep(1000);
+				} catch (Exception e2) {
+				}
+                
             }
         }
 
