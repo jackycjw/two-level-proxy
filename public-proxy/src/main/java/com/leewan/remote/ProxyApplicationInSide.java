@@ -79,7 +79,6 @@ public class ProxyApplicationInSide extends Thread {
     	SocketChannel channel = (SocketChannel) key.channel();
     	
     	try {
-    		
     		if(SocketChannelManager.hasChannle(channel)) {
         		ByteBuffer buf = ByteBuffer.allocateDirect(BUF_SIZE);
         		SocketChannelManager.handleChannelReadContent(channel);

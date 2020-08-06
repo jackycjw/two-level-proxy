@@ -24,20 +24,23 @@ public class SocketChannelManager {
     
     public static int BUF_SIZE = 1024;
     
-    public static Map<SocketChannel, Object> insideChannels = new ConcurrentHashMap<SocketChannel, Object>();
-
+    //隧道号序号生成
     public static AtomicInteger sequence = new AtomicInteger();
-
+    
+    //内网控制通道
     public static SocketChannel controlSocket;
 
+    //用于内外网channel之间映射
     public static Map<Integer, SocketChannel> pair2Channel = new ConcurrentHashMap<Integer, SocketChannel>();
     private static Map<SocketChannel, SocketChannel> channelPairs = new ConcurrentHashMap<SocketChannel, SocketChannel>();
 
-    public static void handleOutSideAccept(SelectionKey key) {
-    	ServerSocketChannel server = (ServerSocketChannel) key.channel();
+    /**
+     * :通知内网通往发起连接
+     * @param channel
+     */
+    public static void notifyInSideConnect(SocketChannel channel) {
     	int pair = sequence.incrementAndGet();
     	try {
-			SocketChannel channel = server.accept();
 			if(controlSocket != null && controlSocket.isConnected()) {
 				pair2Channel.put(pair, channel);
 				ByteBuffer allocate = ByteBuffer.allocate(4);
@@ -45,15 +48,18 @@ public class SocketChannelManager {
 				allocate.flip();
 				controlSocket.write(allocate);
 			}
-			channel.configureBlocking(false);
-			System.out.println(key.selector());
-			channel.register(key.selector(), SelectionKey.OP_READ);
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
     }
     
+    
+    
+    /**
+     * :将通道读取的内容发送到映射通道去
+     * @param channel
+     * @throws IOException
+     */
     public static void handleChannelReadContent(SocketChannel channel) throws IOException {
     	ByteBuffer buf = ByteBuffer.allocate(BUF_SIZE);
     	while(channel.read(buf) > 0) {
@@ -64,6 +70,11 @@ public class SocketChannelManager {
     	}
     }
     
+    /**
+     * :通道映射
+     * @param pair
+     * @param channel
+     */
     public static void matchedPairs(int pair, SocketChannel channel) {
     	if(pair == CONTROL_FLAG) {
     		controlSocket = channel;
@@ -75,11 +86,19 @@ public class SocketChannelManager {
     	}
     }
     
+    /**
+     * :判断内存中是否已存在该通道
+     * @param channel
+     * @return
+     */
     public static boolean hasChannle(SocketChannel channel) {
     	return channelPairs.containsKey(channel);
     }
 
-    
+    /**
+     * :关闭通道，并关闭其映射的通道
+     * @param channel
+     */
     public static void close(SocketChannel channel) {
     	SocketChannel channelPair = channelPairs.get(channel);
     	channelPairs.remove(channel);

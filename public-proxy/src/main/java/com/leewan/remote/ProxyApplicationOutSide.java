@@ -2,6 +2,7 @@ package com.leewan.remote;
 
 
 
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.channels.SelectionKey;
@@ -22,7 +23,6 @@ public class ProxyApplicationOutSide extends Thread {
         	server.configureBlocking(false);
         	Selector selector = Selector.open();
         	server.register(selector, SelectionKey.OP_ACCEPT);
-        	System.out.println(selector);
             while (true){
             	int select = selector.select();
             	if(select > 0) {
@@ -30,7 +30,7 @@ public class ProxyApplicationOutSide extends Thread {
             		while(iterator.hasNext()) {
             			SelectionKey key = iterator.next();
             			if(key.isAcceptable()) {
-            				SocketChannelManager.handleOutSideAccept(key);
+            				handleAccept(key);
             			}
             			if(key.isReadable()) {
             				SocketChannelManager.handleChannelReadContent((SocketChannel)key.channel());
@@ -42,6 +42,18 @@ public class ProxyApplicationOutSide extends Thread {
         }catch (Exception e){
         	e.printStackTrace();
         }
+    }
+    
+    private void handleAccept(SelectionKey key) {
+    	ServerSocketChannel server = (ServerSocketChannel)key.channel();
+		try {
+			SocketChannel channel = server.accept();
+			channel.configureBlocking(false);
+			channel.register(key.selector(), SelectionKey.OP_READ);
+			SocketChannelManager.notifyInSideConnect(channel);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
     }
     
     
