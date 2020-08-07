@@ -17,11 +17,4 @@ public class MathUtil {
 
 
 
-    public static void main(String[] args) {
-        byte[] bytes = getBytes(Integer.MAX_VALUE);
-        for (byte aByte : bytes) {
-            System.out.println(aByte);
-        }
-        System.out.println(getInt(new byte[]{127,-1,-1,-1}));
-    }
 }

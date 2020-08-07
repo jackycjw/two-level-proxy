@@ -30,6 +30,7 @@ public class SocketChannelManager {
      * @param channel
      */
     public static void notifyInSideConnect(SocketChannel channel) {
+    	
     	int pair = sequence.incrementAndGet();
     	try {
 			if(controlSocket != null && controlSocket.isConnected()) {

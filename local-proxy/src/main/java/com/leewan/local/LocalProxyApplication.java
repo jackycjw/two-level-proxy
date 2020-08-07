@@ -1,59 +1,110 @@
 package com.leewan.local;
 
 
-import com.leewan.framework.util.MathUtil;
-import com.leewan.framework.util.ThreadUtils;
+import com.leewan.framework.util.BufferUtils;
+import com.leewan.framework.util.IOUtils;
 
 import org.apache.commons.cli.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.io.InputStream;
+import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.nio.ByteBuffer;
+import java.nio.channels.SelectableChannel;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
+import java.nio.channels.SocketChannel;
+import java.util.Iterator;
 import java.util.concurrent.CountDownLatch;
 
+/**
+ * :程序入口
+ * @author Administrator
+ *
+ */
 public class LocalProxyApplication {
 
     static Logger logger = LoggerFactory.getLogger(LocalProxyApplication.class);
 
     static CountDownLatch latch;
+    
+    static SocketChannel controllChannel;
+    static Selector selector;
 
-    public static void main(String[] args) throws ParseException, InterruptedException, IOException {
+    public static void main(String[] args) throws ParseException {
         initOptions();
         parseArgs(args);
 
         //该socket为控制通道
-        boolean flag = false;
-        Socket remote = null;
-        try {
-        	remote = new Socket(LocalProxyApplication.host_remote, LocalProxyApplication.port_remote);
-            remote.getOutputStream().write(MathUtil.getBytes(Integer.MAX_VALUE));
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
+        initControlChannel();
         
-
-        while(true){
-            try {
-                InputStream inputStream = remote.getInputStream();
-                byte[] bs  = new byte[4];
-                inputStream.read(bs);
-                System.out.println("接受新信号 "+MathUtil.getInt(bs));
-                new ProxyRunner(bs).start();
-
-            } catch (Exception e) {
-            	try {
-            		remote = new Socket(LocalProxyApplication.host_remote, LocalProxyApplication.port_remote);
-                    remote.getOutputStream().write(MathUtil.getBytes(Integer.MAX_VALUE));
-                    ThreadUtils.sleep(1000);
-				} catch (Exception e2) {
-				}
-                
-            }
+        //内外网内容交互
+        ChannelInteraction channelInteraction = new ChannelInteraction();
+        //提交新的交互通道
+        NewPairChannleManager channleManager = new NewPairChannleManager(channelInteraction);
+        
+        channelInteraction.start();
+        channleManager.start();
+        
+        while(true) {
+        	try {
+        		int select = selector.select();
+        		if(select > 0) {
+        			Iterator<SelectionKey> iterator = selector.selectedKeys().iterator();
+        			while(iterator.hasNext()) {
+        				SelectionKey key = iterator.next();
+        				if(key.isReadable()) {
+        					SocketChannel channel = (SocketChannel) key.channel();
+        					ByteBuffer buf = ByteBuffer.allocate(4);
+        					channel.read(buf);
+        					buf.flip();
+        					//添加到队列中，由channleManager线程执行具体的任务提交
+        					channleManager.addChannelId(buf.getInt());
+        				}
+        				
+        				if(key.isConnectable()) {
+        					controllChannel.finishConnect();
+        					key.interestOps(SelectionKey.OP_WRITE);
+        				}
+        				
+        				if(key.isWritable()) {
+        					//发送标志信息，表明自己是控制通道
+        					controllChannel.write(BufferUtils.controlChannelId());
+        					key.interestOps(SelectionKey.OP_READ);
+        				}
+        				iterator.remove();
+        			}
+        		}
+			} catch (Exception e) {
+				e.printStackTrace();
+				initControlChannel();
+			}
+        	
         }
-
     }
+    
+    public static void initControlChannel() {
+    	boolean initSuccess = false;
+    	while(!initSuccess) {
+        	try {
+            	
+            	controllChannel = SocketChannel.open();
+            	controllChannel.configureBlocking(false);
+            	
+            	selector = Selector.open();
+            	//先注册事件，再连接，顺序不能变
+            	controllChannel.register(selector, SelectionKey.OP_CONNECT);
+            	controllChannel.connect(new InetSocketAddress(host_remote, port_remote));
+            	initSuccess = true;
+    		} catch (Exception e) {
+    			e.printStackTrace();
+    			IOUtils.close(controllChannel);
+    		}
+        }
+    }
+    
 
 
     static String PORT_TARGET = "pt";
